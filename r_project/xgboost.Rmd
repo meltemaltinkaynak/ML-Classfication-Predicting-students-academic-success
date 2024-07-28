@@ -1,0 +1,159 @@
+---
+title: "Untitled"
+output: html_document
+---
+dataminingProject <- getwd()
+dataminingProject
+ setwd(dataminingProject)
+
+
+#install.packages("ISLR")
+library(ISLR)
+#install.packages("tidyverse")
+library(tidyverse)
+#install.packages("funModeling")
+library(funModeling)
+#install.packages("caret")
+library(caret)
+#install.packages("pROC")
+library(pROC)
+#install.packages("class")
+library(class)#knn icin
+#install.packages("e1071")
+library(e1071)#knn icin
+#install.packages("kernlab")
+library(kernlab) #svm icin
+#install.packages("ROCR")
+library(ROCR) #roc icin
+#install.packages("neuralnet")
+library(neuralnet)
+#install.packages("GGally")
+library(GGally)
+#install.packages("nnet")
+library(nnet)
+#install.packages("rpart")
+library(rpart)
+#install.packages("cli")
+library(cli)
+#install.packages("tree")
+library(tree)
+#install.packages("rpart.plot")
+library(rpart.plot)
+#install.packages("randomForest")
+library(randomForest)
+#install.packages("gbm")
+library(gbm)
+#install.packages("xgboost")
+library(xgboost)
+#install.packages("DiagrammeR")
+library(DiagrammeR)
+#install.packages("mlbench")
+library(mlbench)
+#install.packages("caTools")
+library(caTools)
+#install.packages("ggplot2)
+library(ggplot2)
+#install.packages("xgboost")
+library(xgboost)
+
+#veri dosyasi okuma
+dataSet <- read.csv("C:/Users/Admin/Documents/dataminingProject/data.csv",header = TRUE, sep=";")
+
+view(dataSet)
+dataSet$Target <- as.factor(dataSet$Target)
+
+#tamsayiya donusturme
+Target = dataSet$Target
+label = as.integer(dataSet$Target)-1
+dataSet$Target = NULL
+
+#egitim ve test setini ayirma
+n = nrow(dataSet)
+train.index = sample(n,floor(0.8*n))
+train.data = as.matrix(dataSet[train.index,])
+train.label = label[train.index]
+test.data = as.matrix(dataSet[-train.index,])
+test.label = label[-train.index]
+
+#DMatrix nesneleri olusturma
+xgb.train = xgb.DMatrix(data=train.data,label=train.label)
+xgb.test = xgb.DMatrix(data=test.data,label=test.label)
+
+# hedef sinif(Target)'daki sınıf sayisi
+num_class = length(levels(Target))
+
+#parametrelerin tanimlanmasi
+params = list(
+  booster = "gbtree",
+  eta = 0.001,
+  max_depth = 5,
+  gamma = 3,
+  subsample = 0.75,
+  colsample_bytree = 1,
+  objective = "multi:softprob",
+  eval_metric= "mlogloss",
+  num_class = num_class
+)
+
+#modeli egitme
+#early_stopping_rounds overfittingi kontrol etmek icin
+xgb.fit = xgb.train(
+  params = params,
+  data = xgb.train,
+  nrounds = 10000,
+  nthread = 1,
+  early_stopping_rounds = 10, 
+  watchlist = list(val1 = xgb.train,val2=xgb.test),
+  verbose = 0
+)
+
+xgb.fit
+
+#tahmin
+xgb.pred = predict(xgb.fit,test.data,reshape=T)
+xgb.pred = as.data.frame(xgb.pred)
+colnames(xgb.pred) = levels(Target)
+
+#gercek etiketleri belirleme tamsayi degerlerine 1 ekleyerek
+xgb.pred$prediction = apply(xgb.pred,1,function(x) colnames(xgb.pred)[which.max(x)])
+xgb.pred$label = levels(Target)[test.label+1]
+
+#Accuracy
+result = sum(xgb.pred$prediction==xgb.pred$label)/nrow(xgb.pred)
+print(paste("Final Accuracy =",sprintf("%1.2f%%", 100*result)))
+
+
+library(caret)
+#Confusion matrix
+conf_matrix <- table(Actual = levels(Target)[test.label + 1], Predicted = xgb.pred$prediction)
+print("Confusion Matrix:")
+print(conf_matrix)
+
+
+
+# Sensitivity, Specificity, Precision, Recall
+sensitivity <- conf_matrix[1, 1] / sum(conf_matrix[1, ])
+specificity <- conf_matrix[2, 2] / sum(conf_matrix[2, ])
+precision <- conf_matrix[1, 1] / sum(conf_matrix[, 1])
+recall <- sensitivity  
+
+print(paste("Sensitivity (True Positive Rate) =", sprintf("%1.2f%%", 100 * sensitivity)))
+print(paste("Specificity (True Negative Rate) =", sprintf("%1.2f%%", 100 * specificity)))
+print(paste("Precision (Positive Predictive Value) =", sprintf("%1.2f%%", 100 * precision)))
+print(paste("Recall (True Positive Rate) =", sprintf("%1.2f%%", 100 * recall)))
+
+#f1 Score
+f1_score <- 2 * (precision * recall) / (precision + recall)
+print(paste("F1 Score =", sprintf("%1.2f", f1_score)))
+
+
+#sınıfların dağılımı- histogram
+hist(label, main="Distribution of Labels", col="lightblue", xlab="Labels")
+
+
+#mlogloss- iteration
+plot(xgb.fit$evaluation_log$iter, xgb.fit$evaluation_log$val1_mlogloss, type="l", col="blue", xlab="Iteration", ylab="mlogloss", main="Model Evaluation")
+lines(xgb.fit$evaluation_log$iter, xgb.fit$evaluation_log$val2_mlogloss, type="l", col="red")
+legend("topright", legend=c("Training", "Testing"), col=c("blue", "red"), lty=1)
+
+

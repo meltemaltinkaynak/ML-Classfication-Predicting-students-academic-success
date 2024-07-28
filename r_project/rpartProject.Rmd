@@ -1,0 +1,247 @@
+---
+title: '"rpart p"'
+output: html_document
+editor_options: 
+  chunk_output_type: inline
+---
+dataminingProject <- getwd()
+dataminingProject
+ setwd(dataminingProject)
+ 
+
+#kutuphaneler
+library(ISLR)
+
+library(tidyverse)
+
+library(funModeling)
+
+library(caret)
+
+library(pROC)
+
+library(class)
+
+library(e1071)
+
+library(kernlab) 
+
+library(ROCR) 
+
+library(neuralnet)
+
+library(GGally)
+
+library(nnet)
+
+library(rpart)
+
+library(cli)
+
+library(tree)
+
+library(rpart.plot)
+
+library(randomForest)
+
+library(gbm)
+
+library(xgboost)
+
+library(DiagrammeR)
+
+library(mlbench)
+
+library(dplyr)
+
+#install.packages("ggplot2)
+library(ggplot2)
+
+
+#veri dosyasi okuma
+dataSet <- read.csv("C:/Users/Admin/Documents/dataminingProject/data.csv",header = TRUE, sep=";")
+
+#veri inceleme
+view(dataSet)
+colnames(dataSet)
+rownames(dataSet) 
+str(dataSet)
+
+
+
+
+
+
+# Target sütununu faktör olarak tanımlama
+dataSet$Target <- factor(dataSet$Target, levels = c("Dropout", "Enrolled", "Graduate"))
+
+
+str(dataSet)
+
+
+view(dataSet)
+
+
+
+summary(dataSet)
+
+library(dplyr)
+
+distinct(dataSet, Marital.status)
+distinct(dataSet, Previous.qualification)
+
+any(is.na(dataSet))
+
+# frekans degerleri
+table(dataSet$Target)
+table(dataSet$GDP)
+table(dataSet$Marital.status)
+table(dataSet$Curricular.units.2nd.sem..approved.)
+table(dataSet$Tuition.fees.up.to.date)
+
+colnames(dataSet)
+#histogram 
+
+barplot(table(dataSet$Target), main = "Histogram of Academic Success" , xlab = " Success" , ylab = "frekans" , col ="yellow")
+
+hist(dataSet$GDP, col="red", main= "Histogram of GDP ", xlab= "GDP", ylab= "frekans")
+
+hist(dataSet$Previous.qualification..grade. , col="blue", main= "Histogram of Previous.qualification..grade. ", xlab= " Previous.qualification..grade.", ylab= "frekans")
+
+hist(dataSet$Curricular.units.2nd.sem..approved. , col="blue", main= "Histogram of Curricular Units 2nd sem Approved ",
+xlab= " Curricular.units.2nd.sem..approved", ylab= "frekans")
+
+
+#pasta grafigi
+pie(table(dataSet$Target), main="Academic Success Distributions", col = c("red" , "yellow" , "blue"))
+
+
+#..
+
+set.seed(123)
+train_indeks <- createDataPartition(dataSet$Target,
+                                    p = .8, 
+                                    list = FALSE,
+                                    times = 1)
+
+train <- dataSet[train_indeks,]
+test <- dataSet[-train_indeks,]
+
+train_x <- train %>% dplyr::select(-Target)
+train_y <- train$Target
+
+test_x <- test %>% dplyr::select(-Target)
+test_y <- test$Target
+
+training <- data.frame(train_x, Target = train_y)
+
+
+##### model 1 :rpart
+#model
+success_rpart <- rpart(Target~., data = train, method = "class")
+
+
+
+#cross-validation hatasini gorsellestirir
+plotcp(success_rpart)
+
+#minimum cross-validation hatasina sahip karmasiklik parametresini (min_cp) bulma
+min_cp <- success_rpart$cptable[which.min(success_rpart$cptable[,"xerror"]), "CP"]
+
+#min_cp hatasiyle agaci budama 
+success_rpart_prune <- prune(success_rpart, cp = min_cp)
+
+prp(success_rpart_prune, type =1)
+
+rpart.plot(success_rpart_prune)
+
+summary(success_rpart_prune)
+
+
+
+#tahmin train icin
+
+predict(success_rpart_prune, train_x, type="class")
+
+
+predict(success_rpart_prune, train_x, type="vector")
+
+cm <- table(predict(success_rpart_prune, train_x, type="class"), train_y)
+
+confusionMatrix(cm, positive ="Dropout")
+
+
+
+#test train icin
+
+predict(success_rpart_prune, test_x, type="class")
+
+
+predict(success_rpart_prune, test_x, type="vector")
+
+cm <- table(predict(success_rpart_prune, test_x, type="class"), test_y)
+
+confusionMatrix(cm, positive ="Dropout")
+
+
+#Caret ile model tuning
+
+set.seed(123)
+
+ctrl <- trainControl(method = "cv",
+                     classProbs = TRUE)
+                     
+cart_tune <- train(x = train_x,
+                    y = train_y,
+                    method = "rpart",
+                    tuneLength = 20,
+                    metric = "Accuracy",
+                    trControl = ctrl)
+                    
+#install.packages("MLmetrics")
+library(MLmetrics)               
+plot(cart_tune)
+
+#caret tahmin
+cmTune2 <- table(predict(cart_tune, train_x), train_y)
+confusionMatrix(cmTune2, positive ="Dropout")
+
+
+cmTune <- table(predict(cart_tune, test_x), test_y)
+confusionMatrix(cmTune, positive ="Dropout")
+
+
+
+
+sum(is.na(train_x))
+sum(is.na(train_y))
+
+
+#Caret ile model tuning
+
+set.seed(123)
+
+ctrl <- trainControl(method = "cv",
+                     classProbs = TRUE)
+                     
+cart_tune <- train(x = train_x,
+                    y = train_y,
+                    method = "rpart",
+                    tuneLength = 50,
+                    metric = "Accuracy",
+                    trControl = ctrl)
+                    
+#install.packages("MLmetrics")
+library(MLmetrics)               
+plot(cart_tune)
+
+#caret tahmin
+cmTune2 <- table(predict(cart_tune, train_x), train_y)
+confusionMatrix(cmTune2, positive ="Dropout")
+
+
+cmTune <- table(predict(cart_tune, test_x), test_y)
+confusionMatrix(cmTune, positive ="Dropout")
+
+
+

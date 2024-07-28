@@ -1,0 +1,162 @@
+---
+title: ''
+output: html_document
+---
+
+dataminingProject <- getwd()
+dataminingProject
+ setwd(dataminingProject)
+
+
+
+#install.packages("ISLR")
+library(ISLR)
+#install.packages("tidyverse")
+library(tidyverse)
+#install.packages("funModeling")
+library(funModeling)
+#install.packages("caret")
+library(caret)
+#install.packages("pROC")
+library(pROC)
+#install.packages("class")
+library(class)#knn icin
+#install.packages("e1071")
+library(e1071)#knn icin
+#install.packages("kernlab")
+library(kernlab) #svm icin
+#install.packages("ROCR")
+library(ROCR) #roc icin
+#install.packages("neuralnet")
+library(neuralnet)
+#install.packages("GGally")
+library(GGally)
+#install.packages("nnet")
+library(nnet)
+#install.packages("rpart")
+library(rpart)
+#install.packages("cli")
+library(cli)
+#install.packages("tree")
+library(tree)
+#install.packages("rpart.plot")
+library(rpart.plot)
+#install.packages("randomForest")
+library(randomForest)
+#install.packages("gbm")
+library(gbm)
+#install.packages("xgboost")
+library(xgboost)
+#install.packages("DiagrammeR")
+library(DiagrammeR)
+#install.packages("mlbench")
+library(mlbench)
+#install.packages("caTools")
+library(caTools)
+#install.packages("ggplot2)
+library(ggplot2)
+#install.packages("xgboost")
+library(xgboost)
+#install.packages("VGAM")
+library(VGAM)
+#install.packages("tidymodels")
+library(tidymodels)
+#install.packages("yardstick")
+library(yardstick)
+
+
+
+#veri dosyasi okuma
+dataSet <- read.csv("C:/Users/Admin/Documents/dataminingProject/data.csv",header = TRUE, sep=";")
+
+
+dataSet$Target <- as.factor(dataSet$Target)
+
+
+#..
+
+newdataset <- dataSet[, c("Curricular.units.2nd.sem..approved.", 
+                        "Curricular.units.2nd.sem..grade.",
+                        "Curricular.units.1st.sem..approved.", 
+                        "Target")]
+                        
+                        
+#..                  
+library(caret)
+set.seed(123)
+train_indeks <- createDataPartition(dataSet$Target,
+                                    p = .8, 
+                                    list = FALSE,
+                                    times = 1)
+
+train <- dataSet[train_indeks,]
+test <- dataSet[-train_indeks,]
+
+train_x <- train %>% dplyr::select(-Target)
+train_y <- train$Target
+
+test_x <- test %>% dplyr::select(-Target)
+test_y <- test$Target
+
+training <- data.frame(train_x, Target = train_y)
+
+#..
+model_fit <- multinom_reg() %>%
+  fit(Target ~ Curricular.units.2nd.sem..approved. + Curricular.units.2nd.sem..grade., 
+      data = training)
+
+#Curricular.units.2nd.sem..approved. 
+#Curricular.units.2nd.sem..grade.
+#Curricular.units.1st.sem..approved.
+
+
+
+#Modelin özeti
+tidy(model_fit, exponentiate = TRUE, conf.int = TRUE) %>%
+  mutate_if(is.numeric, round, 4) %>%
+  select(-std.error, -statistic)
+  
+# Hedef değişkenin seviyelerini ayarla
+training$Target <- relevel(training$Target, ref = "Dropout")
+
+
+glance(model_fit)
+
+# Modelin tahminlerini yapın
+test_preds <- augment(model_fit, new_data = test)
+
+conf_mat(test_preds, truth = Target, estimate = .pred_class)
+
+accuracy(test_preds, truth = Target, estimate = .pred_class)
+
+# precision
+precision(test_preds, truth = Target, estimate = .pred_class)
+
+# recall
+recall(test_preds, truth = Target, estimate = .pred_class)
+
+# F1 score
+f_meas(test_preds, truth = Target, estimate = .pred_class)
+
+
+# Modelin tahminlerini yapın
+test_preds <- augment(model_fit, new_data = test)
+
+
+
+head(test_preds)
+# ROC eğrisini oluşturun
+roc_curve_data <- roc_curve(test_preds, truth = Target, .pred_Dropout ,.pred_Enrolled, .pred_Graduate)
+
+roc_curve_plot <- ggplot(roc_curve_data, aes(x = 1 - specificity, y = sensitivity, color = .level)) +
+  geom_line(linewidth = 1, alpha = 0.7) +
+  geom_abline(slope = 1, linetype = "dotted") +
+  coord_fixed() +
+  labs(color = NULL) +
+  theme_light()
+
+# ROC eğrisini göster
+print(roc_curve_plot)
+
+
+
